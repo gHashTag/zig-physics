@@ -1,0 +1,43 @@
+# This repository had no workflow at all. 87 source files, 640 test blocks,
+# and nothing that ever ran `zig build`. The manifest was written in JSON
+# rather than ZON and failed to parse at line 1, so no compiler had reached
+# any of it.
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mlugg/setup-zig@v1
+        with:
+          version: 0.15.2
+
+      - name: zig build
+        run: zig build
+
+      # `zig build` alone proves almost nothing here: addModule does not
+      # compile anything. The test step is what makes the compiler look.
+      - name: zig build test
+        run: zig build test --summary all
+
+      # A suite that runs zero tests also exits 0. This is the guard against
+      # the state the repository was actually in.
+      - name: refuse a suite that runs nothing
+        run: |
+          set -uo pipefail
+          OUT=$(zig test src/root.zig 2>&1 | tail -3)
+          echo "$OUT"
+          N=$(printf '%s' "$OUT" | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+' | head -1)
+          if [ -z "$N" ] || [ "$N" -lt 200 ]; then
+            echo "FAIL: only '${N:-0}' tests ran; expected at least 200"
+            exit 1
+          fi
+          echo "PASS: $N tests ran"
