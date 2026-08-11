@@ -43,6 +43,10 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
+        // Something in the tree reaches for std.heap.c_allocator. On macOS
+        // libc is always linked so this never showed; on Linux it is
+        // "C allocator is only available when linking against libc".
+        .link_libc = true,
     });
     const tests = b.addTest(.{ .root_module = test_mod });
 
