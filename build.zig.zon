@@ -1,1 +1,11 @@
-{.name: "zig-physics", version: "0.1.0", dependencies: {}}
+.{
+    // Was JSON: {.name: "zig-physics", version: "0.1.0", dependencies: {}}
+    // ZON is not JSON. `zig build` stopped at line 1, column 7, so none of the
+    // 87 source files below were ever reached by a compiler.
+    .name = .zig_physics,
+    .version = "0.1.0",
+    .fingerprint = 0xaba1a1bb81bbef71,
+    .minimum_zig_version = "0.15.0",
+    .dependencies = .{},
+    .paths = .{ "build.zig", "build.zig.zon", "src", "README.md", "LICENSE" },
+}

@@ -4,12 +4,20 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // Library module
-    const physics_mod = b.addModule("zig-physics", .{
+    _ = b.addModule("zig-physics", .{
         .root_source_file = b.path("src/root.zig"),
+        .target = target,
+        .optimize = optimize,
     });
 
-    // Export individual modules
+    // These nine were previously declared inside an `inline for` that first
+    // asked whether the file existed and silently skipped it when it did not.
+    // All nine exist, so the guard protected nothing — it only meant that a
+    // module which went missing would stop being exported without anybody
+    // being told. A package that quietly exports nothing still builds green.
+    //
+    // Declared directly instead: if one of these disappears, the build fails
+    // and says which.
     const modules = [_]struct { name: []const u8, path: []const u8 }{
         .{ .name = "quantum", .path = "src/quantum/root.zig" },
         .{ .name = "gravity", .path = "src/gravity/root.zig" },
@@ -23,23 +31,24 @@ pub fn build(b: *std.Build) void {
     };
 
     inline for (modules) |m| {
-        if (std.fs.path.join(b.allocator, &.{b.build_root_path.path, m.path})) |full_path| {
-            defer b.allocator.free(full_path);
-            if (std.fs.accessAbsolute(full_path, .{})) |_| {
-                const mod = b.addModule(m.name, .{
-                    .root_source_file = b.path(m.path),
-                });
-            } else |_| {}
-        } else |_| {}
+        _ = b.addModule(m.name, .{
+            .root_source_file = b.path(m.path),
+            .target = target,
+            .optimize = optimize,
+        });
     }
 
-    // Tests
-    const tests = b.addTest(.{
+    // addTest takes a root_module rather than a root_source_file since 0.15.
+    const test_mod = b.createModule(.{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
+        // Something in the tree reaches for std.heap.c_allocator. On macOS
+        // libc is always linked so this never showed; on Linux it is
+        // "C allocator is only available when linking against libc".
+        .link_libc = true,
     });
-    b.installArtifact(tests);
+    const tests = b.addTest(.{ .root_module = test_mod });
 
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&b.addRunArtifact(tests).step);

@@ -10,18 +10,18 @@ const e8 = @import("e8_root_system.zig");
 // C ABI Exports
 //===========================================================================
 
-export const e8_result_t = extern enum(c_int) {
+pub const e8_result_t = enum(c_int) {
     SUCCESS = 0,
     ERROR_INVALID_PARAM = -1,
     ERROR_ALLOC_FAILED = -2,
     ERROR_NOT_FOUND = -3,
 };
 
-export const e8_root_t = extern struct {
+pub const e8_root_t = extern struct {
     components: [8]f64,
 };
 
-export const e8_system_t = opaque {};
+pub const e8_system_t = opaque {};
 
 //===========================================================================
 // E8 Root System Functions
@@ -39,7 +39,7 @@ export fn e8_system_create() ?*e8_system_t {
 export fn e8_system_destroy(system: ?*e8_system_t) void {
     if (system) |s| {
         const allocator = std.heap.c_allocator;
-        allocator.destroy(@ptrCast(*e8.E8RootSystem, s));
+        allocator.destroy(@as(*e8.E8RootSystem, @ptrCast(@alignCast(s))));
     }
 }
 
@@ -52,7 +52,7 @@ export fn e8_system_get_root(
     if (system == null or root == null) return .ERROR_INVALID_PARAM;
     if (index >= e8.E8_NUM_ROOTS) return .ERROR_INVALID_PARAM;
 
-    const e8_sys = @ptrCast(*e8.E8RootSystem, system.?);
+    const e8_sys = @as(*e8.E8RootSystem, @ptrCast(@alignCast(system.?)));
     const e8_root = e8_sys.getRoot(index);
 
     root.?.components = e8_root.components;
@@ -113,12 +113,12 @@ export fn e8_get_two_phi() f64 {
 
 test "E8 C ABI - get golden ratio" {
     const phi = e8_get_golden_ratio();
-    try std.testing.expectApproxEqAbs(f64, 1.618033988749895, phi, 1e-10);
+    try std.testing.expectApproxEqAbs(1.618033988749895, phi, 1e-10);
 }
 
 test "E8 C ABI - get two phi" {
     const two_phi = e8_get_two_phi();
-    try std.testing.expectApproxEqAbs(f64, 3.23606797749979, two_phi, 1e-10);
+    try std.testing.expectApproxEqAbs(3.23606797749979, two_phi, 1e-10);
 }
 
 test "E8 C ABI - get dimensions" {
@@ -144,5 +144,5 @@ test "E8 C ABI - root dot product" {
     };
 
     const dot = e8_root_dot(&root1, &root2);
-    try std.testing.expectApproxEqAbs(f64, 0.0, dot, 1e-10);
+    try std.testing.expectApproxEqAbs(0.0, dot, 1e-10);
 }
