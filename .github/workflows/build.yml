@@ -25,19 +25,26 @@ jobs:
 
       # `zig build` alone proves almost nothing here: addModule does not
       # compile anything. The test step is what makes the compiler look.
-      - name: zig build test
-        run: zig build test --summary all
-
-      # A suite that runs zero tests also exits 0. This is the guard against
-      # the state the repository was actually in.
-      - name: refuse a suite that runs nothing
+      # One invocation, read twice: once for the exit code, once for the count.
+      # An earlier version of this guard ran `zig test src/root.zig` directly,
+      # which bypasses the link_libc the build sets — so on Linux it failed
+      # with "C allocator is only available when linking against libc",
+      # produced no count, and reported the suite as empty while the suite was
+      # in fact green. A guard that measures with a different instrument than
+      # the thing it guards reports on the instrument.
+      - name: zig build test, and refuse a suite that runs nothing
         run: |
           set -uo pipefail
-          OUT=$(zig test src/root.zig 2>&1 | tail -3)
-          echo "$OUT"
-          N=$(printf '%s' "$OUT" | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+' | head -1)
+          zig build test --summary all 2>&1 | tee /tmp/test.log
+          RC=${PIPESTATUS[0]}
+          if [ "$RC" -ne 0 ]; then
+            echo "FAIL: the test step exited $RC"
+            exit "$RC"
+          fi
+          N=$(grep -oE '[0-9]+/[0-9]+ tests passed' /tmp/test.log | grep -oE '^[0-9]+' | head -1)
           if [ -z "$N" ] || [ "$N" -lt 200 ]; then
-            echo "FAIL: only '${N:-0}' tests ran; expected at least 200"
+            echo "FAIL: only '${N:-0}' tests ran; expected at least 200."
+            echo "This repository shipped for months with 640 test blocks and 0 running."
             exit 1
           fi
           echo "PASS: $N tests ran"
